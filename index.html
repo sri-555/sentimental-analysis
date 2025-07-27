@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Sentiment Analysis Platform</title>
+    <link rel="stylesheet" href="style.css"> 
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
+    </head><body><div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Review Sentiment Analysis</h1>
+            <p>Analyze customer emotions in e-commerce reviews . Get instant insights into positive, negative, and neutral sentiments to improve your business strategy.</p>
+        </div>
+
+        <!-- Single Review Analysis -->
+        <div class="card">
+            <h2 class="card-title">
+                💬 Single Review Analysis
+            </h2>
+            <p class="card-description">Enter a customer review to analyze its sentiment instantly</p>
+            
+            <div class="input-group">
+                <textarea 
+                    id="reviewText" 
+                    class="textarea" 
+                    placeholder="Enter a customer review here... (e.g., 'This product is amazing! Great quality and fast delivery.')"
+                ></textarea>
+            </div>
+            
+            <button id="analyzeSingle" class="btn">
+                <span>📊</span> Analyze Sentiment
+            </button>
+        </div>
+
+        <!-- Batch Upload -->
+        <div class="card">
+            <h2 class="card-title">
+                📂 Batch Analysis
+            </h2>
+            <p class="card-description">Upload a CSV file with customer reviews for bulk sentiment analysis</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div style="font-size: 3rem; margin-bottom: 15px;">📁</div>
+                <p style="margin-bottom: 10px;">Choose a CSV file or drag and drop</p>
+                <button class="btn btn-outline">Select CSV File</button>
+                <input type="file" id="csvFile" class="file-input" accept=".csv">
+                <p style="margin-top: 15px; font-size: 0.85rem; color: #666;">
+                    Expected format: First column should contain review text
+                </p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <!-- Stats Overview -->
+            <div class="card">
+                <h2 class="card-title">
+                    📊 Analysis Results
+                </h2>
+                <div class="stats-grid" id="statsGrid">
+                    <!-- Stats will be populated here -->
+                </div>
+                
+                <div style="text-align: right; margin-bottom: 20px;">
+                    <button id="exportResults" class="btn btn-outline">
+                        <span>📤</span> Export Results
+                    </button>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="chart-container">
+                <div class="chart-wrapper">
+                    <h3 style="margin-bottom: 15px;">Sentiment Distribution</h3>
+                    <canvas id="sentimentChart" width="400" height="300"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3 style="margin-bottom: 15px;">Confidence Levels</h3>
+                    <canvas id="confidenceChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Word Cloud -->
+            <div class="card">
+                <h2 class="card-title">
+                    🌈 Word Cloud Analysis
+                </h2>
+                <p class="card-description">Key terms driving sentiment in your reviews</p>
+                <div class="wordcloud-container" id="wordCloudContainer"></div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="card">
+                <h2 class="card-title">
+                    📋 Individual Review Results
+                </h2>
+                <div style="overflow-x: auto;">
+                    <table class="results-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Review Text</th>
+                                <th>Sentiment</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Results will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden">
+            <div class="card">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing sentiment...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+    <script> let analysisResults = [];
+        let sentimentChart = null;
+        let confidenceChart = null;
+
+        // Sentiment analysis function
+        function analyzeSentiment(text) {
+            const words = text.toLowerCase().split(/\W+/);
+            const positiveWords = ['good', 'great', 'excellent', 'amazing', 'love', 'perfect', 'best', 'awesome', 'fantastic', 'wonderful', 'outstanding', 'superb', 'brilliant', 'incredible', 'magnificent'];
+            const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'worst', 'horrible', 'poor', 'disappointing', 'useless', 'pathetic', 'disgusting', 'annoying', 'frustrating', 'broken', 'defective'];
+            
+            let score = 0;
+            let wordCount = 0;
+            
+            words.forEach(word => {
+                if (positiveWords.includes(word)) {
+                    score += 1;
+                    wordCount++;
+                }
+                if (negativeWords.includes(word)) {
+                    score -= 1;
+                    wordCount++;
+                }
+            });
+
+            let sentiment, confidence;
+            
+            if (score > 0) {
+                sentiment = 'positive';
+                confidence = Math.min(0.95, 0.6 + (score / Math.max(words.length, 1)) * 0.4);
+            } else if (score < 0) {
+                sentiment = 'negative';
+                confidence = Math.min(0.95, 0.6 + (Math.abs(score) / Math.max(words.length, 1)) * 0.4);
+            } else {
+                sentiment = 'neutral';
+                confidence = 0.7 - (wordCount > 0 ? 0.1 : 0);
+            }
+
+            return { text, sentiment, confidence };
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Update statistics
+        function updateStats() {
+            const statsGrid = document.getElementById('statsGrid');
+            const positive = analysisResults.filter(r => r.sentiment === 'positive').length;
+            const negative = analysisResults.filter(r => r.sentiment === 'negative').length;
+            const neutral = analysisResults.filter(r => r.sentiment === 'neutral').length;
+            const total = analysisResults.length;
+
+            statsGrid.innerHTML = `
+                <div class="stat-card positive">
+                    <div class="stat-number">${positive}</div>
+                    <div class="stat-label">Positive (${total > 0 ? ((positive/total)*100).toFixed(1) : 0}%)</div>
+                </div>
+                <div class="stat-card negative">
+                    <div class="stat-number">${negative}</div>
+                    <div class="stat-label">Negative (${total > 0 ? ((negative/total)*100).toFixed(1) : 0}%)</div>
+                </div>
+                <div class="stat-card neutral">
+                    <div class="stat-number">${neutral}</div>
+                    <div class="stat-label">Neutral (${total > 0 ? ((neutral/total)*100).toFixed(1) : 0}%)</div>
+                </div>
+            `;
+        }
+
+        // Update charts
+        function updateCharts() {
+            const positive = analysisResults.filter(r => r.sentiment === 'positive').length;
+            const negative = analysisResults.filter(r => r.sentiment === 'negative').length;
+            const neutral = analysisResults.filter(r => r.sentiment === 'neutral').length;
+
+            // Sentiment Distribution Chart
+            const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
+            if (sentimentChart) sentimentChart.destroy();
+            
+            sentimentChart = new Chart(sentimentCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Positive', 'Negative', 'Neutral'],
+                    datasets: [{
+                        data: [positive, negative, neutral],
+                        backgroundColor: ['#4CAF50', '#f44336', '#ff9800'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Confidence Chart
+            const confidenceCtx = document.getElementById('confidenceChart').getContext('2d');
+            if (confidenceChart) confidenceChart.destroy();
+
+            const confidenceData = {
+                'High (>80%)': analysisResults.filter(r => r.confidence > 0.8).length,
+                'Medium (60-80%)': analysisResults.filter(r => r.confidence >= 0.6 && r.confidence <= 0.8).length,
+                'Low (<60%)': analysisResults.filter(r => r.confidence < 0.6).length
+            };
+
+            confidenceChart = new Chart(confidenceCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(confidenceData),
+                    datasets: [{
+                        label: 'Number of Reviews',
+                        data: Object.values(confidenceData),
+                        backgroundColor: ['#4CAF50', '#ff9800', '#f44336'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update results table
+        function updateTable() {
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = analysisResults.map((result, index) => `
+                <tr>
+                    <td style="max-width: 300px; word-wrap: break-word;">${result.text}</td>
+                    <td>
+                        <span class="sentiment-badge ${result.sentiment}">
+                            ${result.sentiment.charAt(0).toUpperCase() + result.sentiment.slice(1)}
+                        </span>
+                    </td>
+                    <td>${(result.confidence * 100).toFixed(1)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        // Update word cloud
+        function updateWordCloud() {
+            const container = document.getElementById('wordCloudContainer');
+            container.innerHTML = '';
+
+            // Extract words from all reviews
+            const allWords = analysisResults.flatMap(r => 
+                r.text.toLowerCase()
+                    .replace(/[^\w\s]/g, '')
+                    .split(/\s+/)
+                    .filter(word => word.length > 3)
+            );
+
+            // Count word frequency
+            const wordCount = {};
+            allWords.forEach(word => {
+                wordCount[word] = (wordCount[word] || 0) + 1;
+            });
+
+            // Convert to word cloud format
+            const wordList = Object.entries(wordCount)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 50)
+                .map(([word, count]) => [word, count * 10]);
+
+            if (wordList.length > 0) {
+                WordCloud(container, {
+                    list: wordList,
+                    gridSize: 8,
+                    weightFactor: 3,
+                    fontFamily: 'Arial, sans-serif',
+                    color: function() {
+                        const colors = ['#667eea', '#764ba2', '#4CAF50', '#f44336', '#ff9800'];
+                        return colors[Math.floor(Math.random() * colors.length)];
+                    },
+                    backgroundColor: 'white',
+                    rotateRatio: 0.3
+                });
+            }
+        }
+
+        // Display results
+        function displayResults() {
+            document.getElementById('resultsSection').classList.remove('hidden');
+            updateStats();
+            updateCharts();
+            updateTable();
+            updateWordCloud();
+        }
+
+        // Export results
+        function exportResults() {
+            if (analysisResults.length === 0) {
+                showToast('No results to export', 'error');
+                return;
+            }
+
+            const csvContent = "data:text/csv;charset=utf-8," + 
+                "Review,Sentiment,Confidence\n" +
+                analysisResults.map(r => 
+                    `"${r.text.replace(/"/g, '""')}","${r.sentiment}","${r.confidence.toFixed(2)}"`
+                ).join('\n');
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "sentiment_analysis_results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast('Results exported successfully!');
+        }
+
+        // Event listeners
+        document.getElementById('analyzeSingle').addEventListener('click', function() {
+            const text = document.getElementById('reviewText').value.trim();
+            if (!text) {
+                showToast('Please enter a review to analyze', 'error');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<span>⏳</span> Analyzing...';
+
+            setTimeout(() => {
+                const result = analyzeSentiment(text);
+                analysisResults = [result];
+                displayResults();
+                
+                this.disabled = false;
+                this.innerHTML = '<span>📊</span> Analyze Sentiment';
+                
+                showToast(`Analysis complete: ${result.sentiment} (${(result.confidence * 100).toFixed(1)}% confidence)`);
+            }, 1000);
+        });
+
+        document.getElementById('exportResults').addEventListener('click', exportResults);
+
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('csvFile');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files[0]) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        function handleFileUpload(file) {
+            if (!file.name.endsWith('.csv')) {
+                showToast('Please upload a CSV file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                const lines = csv.split('\n').filter(line => line.trim());
+                
+                if (lines.length < 2) {
+                    showToast('CSV file appears to be empty or invalid', 'error');
+                    return;
+                }
+
+                // Skip header, take sample reviews
+                const sampleReviews = lines.slice(1, Math.min(21, lines.length)); // Max 20 reviews
+                
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+                document.getElementById('resultsSection').classList.add('hidden');
+
+                setTimeout(() => {
+                    analysisResults = sampleReviews.map(line => {
+                        // Handle CSV parsing (simple version)
+                        const review = line.split(',')[0]?.replace(/^"/, '').replace(/"$/, '') || line;
+                        return analyzeSentiment(review);
+                    }).filter(result => result.text.trim());
+
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                    
+                    if (analysisResults.length > 0) {
+                        displayResults();
+                        showToast(`Analyzed ${analysisResults.length} reviews successfully`);
+                    } else {
+                        showToast('No valid reviews found in the CSV file', 'error');
+                    }
+                }, 2000);
+            };
+            reader.readAsText(file);
+        }
+
+        // Enter key support for textarea
+        document.getElementById('reviewText').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                document.getElementById('analyzeSingle').click();
+            }
+        });</script>
+    </body>
+    </html>
